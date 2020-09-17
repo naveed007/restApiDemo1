@@ -3,6 +3,7 @@ package app
 import (
 	"database/sql"
 	"encoding/json"
+	"io/ioutil"
 	"log"
 	"net/http"
 
@@ -17,12 +18,12 @@ type App struct {
 func (app *App) SetupRouter() {
 	app.Router.
 		Methods("GET").
-		Path("/endpoint/{id}").
+		Path("/user/{id}").
 		HandlerFunc(app.getFunction)
 
 	app.Router.
 		Methods("POST").
-		Path("/endpoint").
+		Path("/user").
 		HandlerFunc(app.postFunction)
 }
 
@@ -33,25 +34,35 @@ func (app *App) getFunction(w http.ResponseWriter, r *http.Request) {
 		log.Fatal("No ID in the path")
 	}
 
-	dbdata := &DbData{}
-	err := app.Database.QueryRow("SELECT id, date, name FROM `test` WHERE id = ?", id).Scan(&dbdata.ID, &dbdata.Date, &dbdata.Name)
+	user := &User{}
+	err := app.Database.QueryRow("SELECT * FROM `users` WHERE id = ?", id).Scan(&user)
 	if err != nil {
 		log.Fatal("Database SELECT failed")
 	}
 
 	log.Println("You fetched a thing!")
 	w.WriteHeader(http.StatusOK)
-	if err := json.NewEncoder(w).Encode(dbdata); err != nil {
+	if err := json.NewEncoder(w).Encode(user); err != nil {
 		panic(err)
 	}
 }
 
 func (app *App) postFunction(w http.ResponseWriter, r *http.Request) {
-	_, err := app.Database.Exec("INSERT INTO `test` (name) VALUES ('myname')")
+	reqBody, _ := ioutil.ReadAll(r.Body)
+	var user User
+	json.Unmarshal(reqBody, &user)
+	sqlStatement := `
+			INSERT INTO users (age, email, first_name, last_name)
+			VALUES ($1, $2, $3, $4)
+			RETURNING id`
+	id := 0
+	err := app.Database.QueryRow(sqlStatement, user.age, user.firstname, user.lastName, user.email).Scan(&id)
 	if err != nil {
-		log.Fatal("Database INSERT failed")
+		panic(err)
 	}
 
-	log.Println("You called a thing!")
+	log.Println("new user got created id: ", id)
+	user.id = id
+	json.NewEncoder(w).Encode(user)
 	w.WriteHeader(http.StatusOK)
 }
