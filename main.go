@@ -22,5 +22,5 @@ func main() {
 
 	app.SetupRouter()
 
-	log.Fatal(http.ListenAndServe(":8080", app.Router))
+	log.Fatal(http.ListenAndServe(":8088", app.Router))
 }
